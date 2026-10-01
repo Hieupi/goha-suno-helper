@@ -7,7 +7,7 @@ export const SERVER_NAME = "jr-suno";
 export const BRIDGE_ADDRESS = "ws://127.0.0.1:47831";
 // Đường dẫn cầu nối: CAI-DAT.bat của gói ghi vào install.json trong thư mục extension (installInfo); cầu nối cũng tự
 // báo đường dẫn thật trong tin welcome. Chưa có cả hai thì hiện chỗ trống có hướng dẫn, không đoán đường dẫn máy ai.
-export const DEFAULT_BRIDGE_PATH = "<thư mục GOHA-Suno-Helper>\\bridge\\scripts\\suno_agent_bridge.py";
+export const DEFAULT_BRIDGE_PATH = "<thư mục GOHA-Suno-Helper>\\bridge\\goha_suno\\suno_agent_bridge.py";
 export const DEFAULT_PYTHON = "python";
 const CODE_PATTERN = /^[A-Za-z0-9_-]{32,128}$/;
 

@@ -5,10 +5,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.suno_bridge_core import BridgeCore
-from scripts.suno_clip_status import ClipStatus
-from scripts.suno_jobs import KIND_GENERATE, KIND_MULTITRACK, KIND_STEMS, JobStore
-from scripts.suno_projects import ProjectError, check_project_name, packet_problems, projects_root, song_ids
+from goha_suno.suno_bridge_core import BridgeCore
+from goha_suno.suno_clip_status import ClipStatus
+from goha_suno.suno_jobs import KIND_GENERATE, KIND_MULTITRACK, KIND_STEMS, JobStore
+from goha_suno.suno_projects import ProjectError, check_project_name, packet_problems, projects_root, song_ids
 from tests.helpers import TOKEN, authenticate, clock
 
 SONG_A = "6f19dcde-f082-447d-a0d5-c6f74e4ac837"
@@ -65,7 +65,7 @@ class BridgeProjectTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
         self.home = self.tmp / "GOHA-Suno"
-        self.core = BridgeCore(root=self.tmp / "no-repo", token=TOKEN, now=clock, local_dir=self.tmp / "local",
+        self.core = BridgeCore(token=TOKEN, now=clock, local_dir=self.tmp / "local",
                                clip_status_fetch=clips, projects_root=self.home)
 
     def tearDown(self):
@@ -147,7 +147,7 @@ class BridgeProjectTests(unittest.TestCase):
         self.assertEqual(self.core.enqueue_project_generation("lofi", PACKET)["added"], ["lofi.03.B03"], "dry-run không bị chặn")
 
     def test_requeuing_a_real_create_needs_the_users_ok_again(self):
-        from scripts.suno_jobs import JobTransitionError
+        from goha_suno.suno_jobs import JobTransitionError
 
         self.core.enqueue_project_generation("lofi", PACKET, dry_run=False)
         job = authenticate(self.core)[1]["job"]
@@ -161,7 +161,7 @@ class BridgeProjectTests(unittest.TestCase):
         (self.home / "broken").mkdir(parents=True)
         (self.home / "broken" / "broken-suno-jobs.json").write_text("{not json", encoding="utf-8")
         self.core.enqueue_project_songs("lofi", [SONG_A], "download")
-        fresh = BridgeCore(root=self.tmp / "no-repo", token=TOKEN, now=clock, local_dir=self.tmp / "local",
+        fresh = BridgeCore(token=TOKEN, now=clock, local_dir=self.tmp / "local",
                            clip_status_fetch=clips, projects_root=self.home)
         fresh.recover()
         self.assertEqual(len(fresh.jobs("lofi")), 1)
@@ -170,7 +170,7 @@ class BridgeProjectTests(unittest.TestCase):
     def test_a_restarted_bridge_finds_project_jobs_and_marks_the_one_out_unknown(self):
         self.core.enqueue_project_songs("lofi", [SONG_A], "download")
         authenticate(self.core)
-        fresh = BridgeCore(root=self.tmp / "no-repo", token=TOKEN, now=clock, local_dir=self.tmp / "local",
+        fresh = BridgeCore(token=TOKEN, now=clock, local_dir=self.tmp / "local",
                            clip_status_fetch=clips, projects_root=self.home)
         fresh.recover()
         self.assertEqual([j["status"] for j in fresh.jobs("lofi")], ["unknown"])

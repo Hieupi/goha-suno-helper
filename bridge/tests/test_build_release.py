@@ -27,14 +27,21 @@ class BuildTests(unittest.TestCase):
 
     def test_the_package_has_extension_bridge_installer_guide_and_license(self):
         for relative in ("extension/manifest.json", "extension/sidepanel.html", "extension/ui/about/qr-vietinbank.png",
-                         "bridge/scripts/suno_agent_bridge.py", "bridge/scripts/suno_projects.py", "bridge/requirements.txt",
+                         "bridge/goha_suno/suno_agent_bridge.py", "bridge/goha_suno/suno_projects.py", "bridge/requirements.txt",
                          "bridge/cai_dat.py", "CAI-DAT.bat", "HUONG-DAN.md", "README.md", "LICENSE"):
             self.assertTrue((self.folder / relative).exists(), relative)
 
-    def test_dev_tools_and_tests_stay_out(self):
+    def test_dev_tools_tests_and_the_channels_modules_stay_out(self):
         for relative in ("extension/dev", "extension/tests", "extension/tools", "extension/install.json",
-                         "bridge/scripts/suno_bridge_host.py"):
+                         "bridge/scripts", "bridge/goha_suno/suno_bridge_host.py",
+                         "bridge/goha_suno/episode_audio.py", "bridge/goha_suno/suno_generation.py",
+                         "bridge/goha_suno/export_download_handoff.py", "bridge/goha_suno/validate_suno.py"):
             self.assertFalse((self.folder / relative).exists(), relative)
+
+    def test_the_packaged_bridge_offers_exactly_the_eleven_project_tools(self):
+        tools = build_release.smoke_test(self.folder)
+        self.assertEqual(tools, build_release.COMMUNITY_TOOLS)
+        self.assertEqual(len(tools), 11)
 
     def test_the_installer_has_windows_line_endings(self):
         data = (self.folder / "CAI-DAT.bat").read_bytes()
@@ -54,8 +61,9 @@ class BuildTests(unittest.TestCase):
         (planted / "extension" / "lib" / "path-note.js").write_text("// from E:\\Social Links\\data.json", encoding="utf-8")
         (planted / "extension" / "install.json").write_text("{}", encoding="utf-8")
         (planted / "episodes").mkdir()
+        (planted / "bridge" / "goha_suno" / "episode_audio.py").write_text("", encoding="utf-8")
         problems = build_release.check_package(planted, secrets=[FAKE_SECRET])
-        self.assertEqual(len(problems), 5, problems)
+        self.assertEqual(len(problems), 6, problems)
         self.assertEqual(build_release.check_package(self.folder, secrets=[FAKE_SECRET]), [])
 
 

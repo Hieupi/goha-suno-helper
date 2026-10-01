@@ -47,7 +47,7 @@
   if (state === "run" || state === "human" || state === "wait") {
     session.jrQueue = { type: "queue", paused: state === "human", episodes: [{ episode: "EP008-winter-edo-reading-room", jobs }], receivedAt: now - 5_000 };
   }
-  const local = state === "key" ? { pairingToken: "devPreviewOnly_notARealCode_0123456789abcdef" } : { pairingToken: "devPreviewOnly_notARealCode_0123456789abcdef", bridgePath: String.raw`D:\AI PROJECTS\Japanese Historical BGM\japanese-historical-bgm-engine\scripts\suno_agent_bridge.py` };
+  const local = state === "key" ? { pairingToken: "devPreviewOnly_notARealCode_0123456789abcdef" } : { pairingToken: "devPreviewOnly_notARealCode_0123456789abcdef", bridgePath: String.raw`D:\GOHA-Suno-Helper\bridge\goha_suno\suno_agent_bridge.py` };
   const pick = (store, keys) => Object.fromEntries([keys].flat().filter((k) => k in store).map((k) => [k, store[k]]));
   local.jrActivity = session._activity; // nhật ký nằm ở storage.local (còn sau khi tắt Chrome)
   const listener = () => ({ addListener() {} });

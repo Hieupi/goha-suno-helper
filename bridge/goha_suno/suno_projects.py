@@ -1,14 +1,12 @@
-"""Projects: jobs handed straight to the extension, with no episode records behind them.
+"""Projects: jobs handed straight to the extension, with no other records behind them.
 
-The channel plans its jobs from an episode folder (album_plan.yaml, music_test_results.yaml,
-filed takes). Anyone else using GOHA Suno Helper has none of that: their AI agent names the
-songs (a Suno link or id) or the Create packet directly. A project is just a folder under the
-projects root (`~/GOHA-Suno/<name>/` unless GOHA_SUNO_HOME says otherwise) holding the job list,
+The user's AI agent names the songs (a Suno link or id) or the Create packet directly.
+A project is just a folder under the projects root (`~/GOHA-Suno/<name>/` unless GOHA_SUNO_HOME says otherwise) holding the job list,
 and each song or Create submission takes the next slot number in that project.
 
-Every job is one of the four existing kinds (download / generate / 32-bit export / stems split),
-so the extension, the credit safety rules and the bridge treat them exactly like episode jobs.
-Packets are checked against Suno's own limits only, never against the channel's rules.
+Every job is one of the four job kinds (download / generate / 32-bit export / stems split),
+so the extension, the credit safety rules and the bridge treat them like any other job.
+Packets are checked against Suno's own limits only.
 """
 
 from __future__ import annotations
@@ -18,14 +16,12 @@ import re
 from pathlib import Path
 from typing import Callable, Iterable
 
-from scripts.episode_audio import JOBS_SUFFIX
-from scripts.suno_clip_status import ClipStatus, check_clips
-from scripts.suno_jobs import DownloadJob, GenerateJob, JobStore, MultitrackJob, StemsJob
+from goha_suno.suno_clip_status import ClipStatus, check_clips
+from goha_suno.suno_jobs import JOBS_SUFFIX, DownloadJob, GenerateJob, JobStore, MultitrackJob, StemsJob
 
 # Lower case only: Windows folders ignore case, so "Lofi" and "lofi" must never become two job lists on one file.
 PROJECT_NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,40}$")
 WINDOWS_RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
-EPISODE_NAME = re.compile(r"^EP\d{3}(?:-|$)")
 HOME_ENV = "GOHA_SUNO_HOME"
 # A song link (`suno.com/song/<id>`) or a bare id. Short share links (`suno.com/s/<code>`) hide the id and are refused.
 SONG_ID_IN_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE)
@@ -59,12 +55,12 @@ def projects_root(environ: "dict[str, str] | None" = None) -> Path:
     return Path(value).expanduser() if value else Path.home() / "GOHA-Suno"
 
 
-def is_episode_name(name: str) -> bool:
-    return bool(EPISODE_NAME.match(name))
+def is_project_name(name: object) -> bool:
+    return isinstance(name, str) and bool(PROJECT_NAME.fullmatch(name)) and name not in WINDOWS_RESERVED
 
 
 def check_project_name(name: str) -> str:
-    if not isinstance(name, str) or not PROJECT_NAME.fullmatch(name) or name in WINDOWS_RESERVED:
+    if not is_project_name(name):
         raise ProjectError(
             f"tên dự án {name!r} không hợp lệ: 1–41 ký tự chữ thường không dấu, số, '-' hoặc '_' (ví dụ lofi-thang10)"
         )
@@ -198,8 +194,4 @@ def plan_generation(store: JobStore, project: str, packet: dict, count: int = 1,
                     packet=dict(full), dry_run=dry_run, min_seconds=floor)
         for slot in range(first, first + count)
     ]
-
-
-def is_project_job(job) -> bool:
-    return not is_episode_name(job.episode)
 

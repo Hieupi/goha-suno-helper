@@ -1,3 +1,2 @@
 mcp>=2.0,<3
 websockets>=13.1,<16
-PyYAML>=6.0,<7

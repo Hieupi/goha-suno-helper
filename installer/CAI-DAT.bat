@@ -28,7 +28,7 @@ if not defined PY (
 )
 echo  [1/3] Python: "%PY%"
 
-echo  [2/3] Cai thu vien cho cau noi (mcp, websockets, PyYAML)...
+echo  [2/3] Cai thu vien cho cau noi (mcp, websockets)...
 "%PY%" -m pip install --disable-pip-version-check --quiet -r "bridge\requirements.txt"
 if errorlevel 1 (
   echo  [!] Cai thu vien that bai. Xem dong bao loi o tren, kiem tra mang roi chay lai CAI-DAT.bat.

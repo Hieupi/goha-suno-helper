@@ -6,9 +6,9 @@ owner's session. No token, cookie or header of the owner's is ever sent.
 
 The extra metadata fields (`tags`, `negative_tags`, `is_max_mode`,
 `make_instrumental`) let a real generation's result be checked against the
-packet that was sent (`scripts.suno_generation.check_packet_against_clips`).
+packet that was sent (`check_packet_against_clips`).
 
-    python scripts/suno_clip_status.py <clip-id> [<clip-id> ...]
+    python bridge/goha_suno/suno_clip_status.py <clip-id> [<clip-id> ...]
 """
 
 from __future__ import annotations
@@ -17,11 +17,7 @@ import json
 import re
 import sys
 import urllib.request
-from pathlib import Path
 from typing import Callable, NamedTuple
-
-if __package__ in (None, ""):
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 CLIP_ENDPOINT = "https://studio-api.prod.suno.com/api/clip/{}"
 UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
@@ -87,12 +83,44 @@ def check_clips(clip_ids: list[str], fetch: Fetch = _fetch_json) -> list[ClipSta
     return results
 
 
-def main() -> int:
-    from scripts.cli_output import ensure_utf8_stdout, write_stdout
+def check_packet_against_clips(wire_packet: dict, min_seconds: float, statuses: list[ClipStatus]) -> dict[str, dict]:
+    """Compare Suno's own public clip metadata against the packet a real generation sent.
 
-    ensure_utf8_stdout()
+    `statuses` is what `check_clips` returns (or a stand-in with the same fields, for tests):
+    one entry per clip id, in order, never raising for an individual clip's own fetch failure.
+    """
+    checks: dict[str, dict] = {}
+    for status in statuses:
+        if status.error is not None:
+            checks[status.id] = {"ok": None, "mismatches": [], "unavailable": True}
+            continue
+        mismatches: list[str] = []
+        # Suno v6 rewrites the Styles text server-side for every clip, so a different non-empty
+        # text is expected and only noted; the extension already read the sent Styles back from
+        # the form before clicking Create.
+        styles_rewritten = bool(status.tags) and status.tags != wire_packet.get("styles")
+        if not status.tags:
+            mismatches.append("styles")
+        if status.negative_tags != wire_packet.get("exclude"):
+            mismatches.append("exclude")
+        if bool(status.is_max_mode) != bool(wire_packet.get("maxMode")):
+            mismatches.append("max_mode")
+        if not status.make_instrumental:
+            mismatches.append("instrumental")
+        if status.seconds is None or status.seconds < min_seconds:
+            mismatches.append("duration")
+        check = {"ok": not mismatches, "mismatches": mismatches}
+        if styles_rewritten:
+            check["styles_rewritten"] = True
+        checks[status.id] = check
+    return checks
+
+
+def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     results = check_clips(sys.argv[1:])
-    write_stdout(json.dumps([result._asdict() for result in results], ensure_ascii=False, indent=2) + "\n")
+    sys.stdout.write(json.dumps([result._asdict() for result in results], ensure_ascii=False, indent=2) + "\n")
     return 0 if all(result.error is None for result in results) else 1
 
 

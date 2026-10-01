@@ -1,4 +1,4 @@
-// Giao thức với cầu nối Python (scripts/suno_bridge_core.py). Mỗi tin nhắn là một object JSON.
+// Giao thức với cầu nối Python (bridge/goha_suno/suno_bridge_core.py). Mỗi tin nhắn là một object JSON.
 // Module THUẦN: kiểm tra chặt mọi tin nhắn đến trước khi background làm theo — cầu nối chỉ nghe
 // 127.0.0.1 và đã ghép cặp, nhưng extension vẫn không tin dữ liệu chưa kiểm.
 

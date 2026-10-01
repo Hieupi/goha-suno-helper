@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "GOHA Suno Helper",
   "short_name": "GOHA Suno",
-  "version": "1.2.3",
-  "version_name": "1.2.3 · ProMax",
+  "version": "1.3.0",
+  "version_name": "1.3.0 · ProMax",
   "minimum_chrome_version": "116",
   "description": "GOHA: trợ lý AI của bạn (Claude Code, Codex, Antigravity) giao việc qua cầu nối 127.0.0.1; extension lái giao diện Suno để tạo nhạc và tải WAV. Không đọc phiên đăng nhập, dừng ở CAPTCHA.",
   "permissions": [

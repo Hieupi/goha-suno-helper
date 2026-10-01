@@ -7,7 +7,7 @@ import { parseIncoming } from "../lib/protocol.js";
 // Kết nối kiểu Goha: một khối cấu hình MCP có sẵn mã, một nút Copy. Mã sinh ở extension phải qua được
 // bộ kiểm của cầu nối Python (^[A-Za-z0-9_-]{32,128}$).
 
-const PATH = "D:\\Other Folder\\repo\\scripts\\suno_agent_bridge.py";
+const PATH = "D:\\Other Folder\\repo\\bridge\\goha_suno\\suno_agent_bridge.py";
 
 test("mã mới: 43 ký tự base64url, đủ điều kiện cầu nối, mỗi lần một khác", () => {
   const a = newPairingCode((n) => randomBytes(n));
@@ -44,8 +44,8 @@ test("welcome của cầu nối mang đường dẫn .py hợp lệ thì extensi
 });
 
 test("install.json của trình cài: chỉ nhận đường dẫn .py / .exe, đưa python của máy vào cấu hình MCP", () => {
-  const info = installInfo({ bridgePath: "C:/GOHA/bridge/scripts/suno_agent_bridge.py", python: "C:/Python312/python.exe", extra: "x" });
-  assert.deepEqual(info, { bridgePath: "C:/GOHA/bridge/scripts/suno_agent_bridge.py", python: "C:/Python312/python.exe" });
+  const info = installInfo({ bridgePath: "C:/GOHA/bridge/goha_suno/suno_agent_bridge.py", python: "C:/Python312/python.exe", extra: "x" });
+  assert.deepEqual(info, { bridgePath: "C:/GOHA/bridge/goha_suno/suno_agent_bridge.py", python: "C:/Python312/python.exe" });
   const server = JSON.parse(mcpConfig({ code: "C0DE", ...info })).mcpServers["jr-suno"];
   assert.deepEqual([server.command, server.args[0]], ["C:/Python312/python.exe", info.bridgePath]);
   assert.deepEqual(installInfo({ bridgePath: "rm -rf /", python: "calc.bat" }), { bridgePath: "", python: "" });
@@ -59,6 +59,6 @@ test("install.json: đường dẫn mạng (UNC), URL, đường dẫn tương �
   for (const bad of [unc, "https://x.y/a.py", "bridge/x.py", 'C:/a".py', "C:/a\n.py"]) {
     assert.equal(installInfo({ bridgePath: bad }).bridgePath, "", JSON.stringify(bad));
   }
-  const local = String.raw`D:\GOHA Suno\bridge\scripts\suno_agent_bridge.py`;
+  const local = String.raw`D:\GOHA Suno\bridge\goha_suno\suno_agent_bridge.py`;
   assert.equal(installInfo({ bridgePath: local }).bridgePath, local);
 });

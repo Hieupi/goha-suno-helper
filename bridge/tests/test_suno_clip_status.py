@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.suno_clip_status import CLIP_ENDPOINT, ClipStatus, check_clips, parse_clip
+from goha_suno.suno_clip_status import CLIP_ENDPOINT, ClipStatus, check_clips, check_packet_against_clips, parse_clip
 
 GOOD = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
 OTHER = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
@@ -72,6 +72,36 @@ class CheckTests(unittest.TestCase):
 
     def test_endpoint_is_https_and_unauthenticated(self):
         self.assertTrue(CLIP_ENDPOINT.startswith("https://studio-api.prod.suno.com/api/clip/"))
+
+
+WIRE = {"title": "t", "styles": "koto, rain", "exclude": "vocals", "maxMode": True}
+
+
+def rendered(**overrides):
+    fields = dict(id=GOOD, status="complete", title="t", seconds=330.0, type="gen", tags=WIRE["styles"],
+                  negative_tags=WIRE["exclude"], is_max_mode=True, make_instrumental=True, error=None)
+    return ClipStatus(**{**fields, **overrides})
+
+
+class PacketCheckTests(unittest.TestCase):
+    def test_a_clip_matching_the_packet_is_ok(self):
+        self.assertEqual(check_packet_against_clips(WIRE, 320, [rendered()])[GOOD], {"ok": True, "mismatches": []})
+
+    def test_short_duration_is_reported(self):
+        result = check_packet_against_clips(WIRE, 320, [rendered(seconds=100.0)])[GOOD]
+        self.assertEqual((result["ok"], result["mismatches"]), (False, ["duration"]))
+
+    def test_styles_rewritten_by_suno_is_noted_not_a_mismatch(self):
+        result = check_packet_against_clips(WIRE, 320, [rendered(tags="Suno's own rewrite")])[GOOD]
+        self.assertEqual(result, {"ok": True, "mismatches": [], "styles_rewritten": True})
+
+    def test_missing_styles_exclude_max_mode_and_vocals_are_mismatches(self):
+        result = check_packet_against_clips(WIRE, 320, [rendered(tags="", negative_tags="", is_max_mode=False, make_instrumental=False)])
+        self.assertEqual(result[GOOD]["mismatches"], ["styles", "exclude", "max_mode", "instrumental"])
+
+    def test_a_fetch_error_on_one_clip_is_reported_as_unavailable(self):
+        result = check_packet_against_clips(WIRE, 320, [rendered(status=None, error="timed out")])
+        self.assertEqual(result[GOOD], {"ok": None, "mismatches": [], "unavailable": True})
 
 
 if __name__ == "__main__":

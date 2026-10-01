@@ -3,10 +3,10 @@
 
     python tools/build_release.py            # -> dist/GOHA-Suno-Helper-<version>/ and .zip
 
-The package holds the extension (without dev/, tests/, tools/), the bridge modules it needs,
+The package holds the extension (without dev/, tests/, tools/), the bridge package (goha_suno),
 the installer and the Vietnamese guide. It is checked before zipping: no pairing code or other
-secret of this machine, no path of this machine, none of the channel's data folders, and the
-packaged bridge must start on its own with exactly the project tools.
+secret of this machine, no path of this machine, none of the channel's data folders or modules,
+and the packaged bridge must start on its own with exactly the project tools.
 """
 
 from __future__ import annotations
@@ -24,21 +24,24 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 EXTENSION = ROOT / "extension"
-BRIDGE_SCRIPTS = ROOT / "bridge" / "scripts"
+BRIDGE_PACKAGE = ROOT / "bridge" / "goha_suno"
 INSTALLER = ROOT / "installer"
 PACKAGE_NAME = "GOHA-Suno-Helper"
 
 EXTENSION_SKIP = {"dev", "tests", "tools", "install.json", "node_modules", "__pycache__"}
-# The bridge and everything it imports. The file-driven host (suno_bridge_host.py) stays out: it takes commands
-# from files with no pairing code, fine on the channel's own machine, not something to hand to strangers.
+# The bridge package, module by module: nothing else that may sit in the folder ships.
 BRIDGE_MODULES = (
-    "__init__.py", "cli_output.py", "episode_audio.py", "export_download_handoff.py", "suno_agent_bridge.py",
-    "suno_bridge_core.py", "suno_clip_status.py", "suno_generation.py", "suno_jobs.py",
-    "suno_projects.py", "validate_suno.py", "validation_types.py",
+    "__init__.py", "suno_agent_bridge.py", "suno_bridge_core.py", "suno_clip_status.py", "suno_jobs.py",
+    "suno_plugin.py", "suno_projects.py", "suno_stamp.py",
 )
 COMMUNITY_TOOLS = {
     "suno_status", "suno_check_clips", "suno_jobs", "suno_pause", "suno_resume", "suno_cancel", "suno_requeue",
     "suno_download_songs", "suno_export_32bit", "suno_split_stems", "suno_generate",
+}
+# The channel's episode modules live in its own repo, behind its plugin (bridge/goha_suno/suno_plugin.py).
+CHANNEL_MODULES = {
+    "episode_audio.py", "suno_generation.py", "export_download_handoff.py", "validate_suno.py", "validation_types.py",
+    "cli_output.py", "suno_bridge_host.py", "goha_episode_plugin.py", "episode_jobs.py",
 }
 FORBIDDEN_DIRS = {"episodes", "knowledge", "plans", ".git", "__pycache__", "node_modules", "dev", "tests"}
 FORBIDDEN_TEXT = (
@@ -79,10 +82,10 @@ def _copy_extension(target: Path) -> None:
 
 
 def _copy_bridge(target: Path) -> None:
-    scripts = target / "scripts"
-    scripts.mkdir(parents=True)
+    package = target / BRIDGE_PACKAGE.name
+    package.mkdir(parents=True)
     for name in BRIDGE_MODULES:
-        shutil.copy2(BRIDGE_SCRIPTS / name, scripts / name)
+        shutil.copy2(BRIDGE_PACKAGE / name, package / name)
     shutil.copy2(ROOT / "bridge" / "requirements.txt", target / "requirements.txt")
     shutil.copy2(INSTALLER / "cai_dat.py", target / "cai_dat.py")
 
@@ -110,6 +113,8 @@ def check_package(folder: Path, secrets: list[str] | None = None) -> list[str]:
             continue
         if path.name == "install.json":
             problems.append(f"install.json của máy này: {relative}")
+        if path.name in CHANNEL_MODULES:
+            problems.append(f"mã riêng của kênh: {relative}")
         if path.suffix.lower() not in TEXT_SUFFIXES:
             continue
         text = path.read_text(encoding="utf-8", errors="ignore")
@@ -123,13 +128,14 @@ def smoke_test(folder: Path) -> set[str]:
     """Start the packaged bridge's MCP server in a fresh process (no repo on its path) and list its tools."""
     code = (
         "import asyncio, sys, tempfile; from pathlib import Path\n"
-        "import scripts.suno_agent_bridge as a\n"
-        "from scripts.suno_bridge_core import BridgeCore\n"
-        "core = BridgeCore(root=a.ROOT, token='t' * 43, now=lambda: '2026-01-01T00:00:00Z', projects_root=Path(tempfile.mkdtemp()))\n"
+        "import goha_suno.suno_agent_bridge as a\n"
+        "from goha_suno.suno_bridge_core import BridgeCore\n"
+        "core = BridgeCore(token='t' * 43, now=lambda: '2026-01-01T00:00:00Z', projects_root=Path(tempfile.mkdtemp()))\n"
         "server = a.build_server(a.SocketBridge(core), 0)\n"
         "print(','.join(sorted(t.name for t in asyncio.run(server.list_tools()))))\n"
     )
-    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    # A community install has no plugin: the dev machine's own GOHA_SUNO_PLUGIN must not leak into the check.
+    env = {key: value for key, value in os.environ.items() if key not in ("PYTHONPATH", "GOHA_SUNO_PLUGIN")}
     completed = subprocess.run([sys.executable, "-c", code], cwd=folder / "bridge", capture_output=True, text=True,
                                encoding="utf-8", env=env, check=False)
     if completed.returncode != 0:

@@ -1,21 +1,21 @@
-"""Jobs the agent hands to the JR Suno Helper extension.
+"""Jobs the agent hands to the GOHA Suno Helper extension.
 
-Four kinds share one queue and one file. A `DownloadJob` is one candidate to
-Studio-export and download as WAV; the plan comes from the same records the
-worklist and the handoff read (`choose_candidates`), so the episode's own data
-stays the single source of truth. A `GenerateJob` is one Suno Create submission
-filled from a compiled SUNO INPUT PACKET (`scripts/suno_generation.py` builds
-and validates it); real (non-dry-run) generation spends Suno credits. A
-`MultitrackJob` re-exports a filed take from Studio as a 32-bit float ZIP (free).
-A `StemsJob` splits a filed take into stems on Suno (Auto split, 50 credits when
-not dry-run) and exports the mix plus every stem as one 32-bit float ZIP.
+Four kinds share one queue and one file. A `DownloadJob` is one Suno song to
+Studio-export and download as WAV. A `GenerateJob` is one Suno Create submission
+filled from a packet in the extension's wire shape; real (non-dry-run) generation
+spends Suno credits. A `MultitrackJob` re-exports a song from Studio as a 32-bit
+float ZIP (free). A `StemsJob` splits a song into stems on Suno (Auto split, 50
+credits when not dry-run) and exports the mix plus every stem as one 32-bit float ZIP.
+
+Who plans the jobs is not this module's business: a project (`suno_projects.py`)
+plans them from song links or a Create packet, a plugin (`suno_plugin.py`) from its
+own records. Every job list is persisted as `<name>-suno-jobs.json` in its folder.
 
 Jobs are immutable values; `JobStore` swaps a whole job for its successor on every
-transition and persists the list next to the episode as `<EP###>-suno-jobs.json`.
-A job the extension was working on when the link dropped becomes `unknown` and is
-never retried by itself: exporting the same candidate twice creates a duplicate
-song on Suno, and a real generation left `unknown` may already have spent
-credits, so only the agent (or the owner) may requeue it.
+transition and persists the list. A job the extension was working on when the link
+dropped becomes `unknown` and is never retried by itself: exporting the same song
+twice creates a duplicate song on Suno, and a real generation left `unknown` may
+already have spent credits, so only the agent (or the user) may requeue it.
 """
 
 from __future__ import annotations
@@ -26,25 +26,14 @@ import time
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
-from scripts.episode_audio import (
-    ENCODING,
-    JOBS_SUFFIX,
-    KIND_DOWNLOAD,
-    has_split_stems,
-    iter_takes,
-    stems_dir_for,
-    TRUNCATED_BELOW,
-    load_slot_targets,
-    load_slot_titles,
-)
-from scripts.export_download_handoff import choose_candidates
-
 SCHEMA_VERSION = 1
-# The owner accepts 320-330 s for a 330 s slot: ten seconds under target at most.
-OWNER_MARGIN_SECONDS = 10
+ENCODING = "utf-8"
+# Every job list lives in `<name>-suno-jobs.json` (a project's name, or the name a plugin gives its own list).
+JOBS_SUFFIX = "-suno-jobs.json"
 
+KIND_DOWNLOAD = "export_download"
 KIND_GENERATE = "generate"
-# Studio → Export → Multitrack of a take already filed: its full mix as 48 kHz / 32-bit float (0 credits,
+# Studio → Export → Multitrack of a song: its full mix as 48 kHz / 32-bit float (0 credits,
 # no monthly quota) until stems are split, then every stem. Seen on Suno 2026-09-28.
 KIND_MULTITRACK = "multitrack_export"
 # Suno "Extract Stems and MIDI" → Auto split (50 credits, measured 2026-10-01), then Studio → Export →
@@ -109,14 +98,13 @@ class DownloadJob:
 
 @dataclass(frozen=True)
 class GenerateJob:
-    """One Suno Create submission, filled from a compiled SUNO INPUT PACKET.
+    """One Suno Create submission.
 
     `packet` is already in the wire shape the extension fills the Create form
-    from (`scripts.suno_generation.wire_packet_from_album_plan`), not the
-    album_plan.yaml packet shape. `dry_run=True` fills and reads back the form
+    from (see `suno_projects.DEFAULT_PACKET`). `dry_run=True` fills and reads back the form
     without pressing Create, so it never spends a credit; `dry_run=False` does,
     and the state machine below refuses to hand out a second real submission
-    for a slot until the agent (or the owner) decides what happened to the
+    for a slot until the agent (or the user) decides what happened to the
     first one.
     """
 
@@ -149,13 +137,13 @@ class GenerateJob:
 
 @dataclass(frozen=True)
 class MultitrackJob:
-    """One filed take to export again from Studio as a Multitrack ZIP (32-bit float WAV inside)."""
+    """One song to export again from Studio as a Multitrack ZIP (32-bit float WAV inside)."""
 
     id: str
     episode: str
     slot: int
     take: int
-    song_id: str  # the id stamped on the filed WAV: that song opens in Studio as it is
+    song_id: str  # that song opens in Studio as it is
     expected_title: str
     min_seconds: float
     kind: str = KIND_MULTITRACK
@@ -179,7 +167,7 @@ class MultitrackJob:
 
 @dataclass(frozen=True)
 class StemsJob:
-    """One filed take to split into stems on Suno and export (mix + stems) as a 32-bit float ZIP.
+    """One song to split into stems on Suno and export (mix + stems) as a 32-bit float ZIP.
 
     `dry_run=True` only opens Suno's stem dialog and reports whether the take was split
     already; `dry_run=False` presses Extract when it was not, which spends credits. Once a
@@ -222,101 +210,6 @@ class StemsJob:
         return wire
 
 
-def plan_stems_jobs(
-    episode_dir: Path, slots: "list[int]", takes: "list[int] | None" = None, dry_run: bool = True
-) -> "list[StemsJob]":
-    """One job per filed take (with a Suno stamp) of the named slots that has no split stems filed yet.
-
-    Slots are required: splitting costs credits per song, so there is no "every slot" default.
-    A stems folder holding only the mix (a free 32-bit export) does not count as split.
-    """
-    if not slots:
-        raise ValueError("name the slots to split; splitting spends Suno credits per song")
-    titles = load_slot_titles(episode_dir)
-    targets = load_slot_targets(episode_dir)
-    short_id = episode_dir.name.split("-")[0]
-    jobs = []
-    for take in sorted(iter_takes(episode_dir), key=lambda t: (t.slot, t.take)):
-        if take.stamp is None or take.slot not in titles or take.slot not in slots:
-            continue
-        if (takes is not None and take.take not in takes) or has_split_stems(episode_dir, take.slot, take.take):
-            continue
-        jobs.append(
-            StemsJob(
-                id=f"{short_id}.{take.slot:02d}.ST{take.take}",
-                episode=episode_dir.name,
-                slot=take.slot,
-                take=take.take,
-                song_id=take.stamp.song_id,
-                expected_title=titles[take.slot],
-                min_seconds=min_seconds_for(targets.get(take.slot, 0)),
-                dry_run=dry_run,
-            )
-        )
-    return jobs
-
-
-def plan_multitrack_jobs(episode_dir: Path, slots: "list[int] | None" = None) -> "list[MultitrackJob]":
-    """One job per filed take (with a Suno stamp) whose `stems/` folder does not exist yet."""
-    titles = load_slot_titles(episode_dir)
-    targets = load_slot_targets(episode_dir)
-    short_id = episode_dir.name.split("-")[0]
-    jobs = []
-    for take in sorted(iter_takes(episode_dir), key=lambda t: (t.slot, t.take)):
-        if take.stamp is None or take.slot not in titles or (slots is not None and take.slot not in slots):
-            continue
-        if stems_dir_for(episode_dir, take.slot, take.take).exists():
-            continue
-        jobs.append(
-            MultitrackJob(
-                id=f"{short_id}.{take.slot:02d}.MT{take.take}",
-                episode=episode_dir.name,
-                slot=take.slot,
-                take=take.take,
-                song_id=take.stamp.song_id,
-                expected_title=titles[take.slot],
-                min_seconds=min_seconds_for(targets.get(take.slot, 0)),
-            )
-        )
-    return jobs
-
-
-def min_seconds_for(target_seconds: int) -> float:
-    """Shortest render worth downloading: the owner's floor, never below the code's truncation line."""
-    return max(target_seconds - OWNER_MARGIN_SECONDS, target_seconds * TRUNCATED_BELOW)
-
-
-def plan_download_jobs(episode_dir: Path) -> tuple[list[DownloadJob], dict[int, int]]:
-    """Jobs for every missing take, and the slots that lack enough usable candidates.
-
-    Each slot gets exactly as many jobs as it is missing takes, taken in the
-    order `choose_candidates` ranks them (newest regeneration first).
-    """
-    usable, needed = choose_candidates(episode_dir)
-    titles = load_slot_titles(episode_dir)
-    targets = load_slot_targets(episode_dir)
-    short_id = episode_dir.name.split("-")[0]
-    jobs: list[DownloadJob] = []
-    short: dict[int, int] = {}
-    for slot, count in sorted(needed.items()):
-        chosen = usable.get(slot, [])[:count]
-        if len(chosen) < count:
-            short[slot] = count - len(chosen)
-        for candidate in chosen:
-            jobs.append(
-                DownloadJob(
-                    id=f"{short_id}.{slot:02d}.{candidate.song_id}",
-                    episode=episode_dir.name,
-                    slot=slot,
-                    candidate_id=candidate.candidate_id,
-                    song_id=candidate.song_id,
-                    expected_title=titles[slot],
-                    min_seconds=min_seconds_for(targets.get(slot, 0)),
-                )
-            )
-    return jobs, short
-
-
 def _check_result(kind: str, status: str, result: dict) -> None:
     if kind == KIND_GENERATE:
         if status == "done" and result.get("dry_run") is False:
@@ -339,7 +232,7 @@ def _check_result(kind: str, status: str, result: dict) -> None:
         raise JobTransitionError("a finished download job must report export_id and filename")
 
 
-def _job_from_dict(data: dict) -> "DownloadJob | GenerateJob":
+def job_from_dict(data: dict) -> "DownloadJob | GenerateJob | MultitrackJob | StemsJob":
     """Rebuild the right dataclass; a file written before v2 has no `kind` at all."""
     if data.get("kind") == KIND_GENERATE:
         return GenerateJob(**data)
@@ -356,23 +249,19 @@ SAVE_RETRY_SECONDS = 0.05
 
 
 class JobStore:
-    """The job list of one episode, persisted as JSON beside the episode's records."""
+    """One job list (a project's, or one a plugin owns), persisted as JSON in its folder."""
 
     def __init__(self, path: Path, jobs: "tuple[DownloadJob | GenerateJob, ...]" = ()):
         self.path = path
         self.jobs: "tuple[DownloadJob | GenerateJob, ...]" = jobs
 
     @classmethod
-    def for_episode(cls, episode_dir: Path) -> "JobStore":
-        return cls.at(episode_dir / f"{episode_dir.name.split('-')[0]}{JOBS_SUFFIX}")
-
-    @classmethod
     def at(cls, path: Path) -> "JobStore":
-        """The job list saved at `path` (an episode's or a project's), empty when the file does not exist yet."""
+        """The job list saved at `path`, empty when the file does not exist yet."""
         if not path.exists():
             return cls(path)
         data = json.loads(path.read_text(encoding=ENCODING))
-        return cls(path, tuple(_job_from_dict(job) for job in data.get("jobs", [])))
+        return cls(path, tuple(job_from_dict(job) for job in data.get("jobs", [])))
 
     def save(self) -> None:
         """Write beside the file, then swap it in: a crash mid-write never leaves half a job list."""

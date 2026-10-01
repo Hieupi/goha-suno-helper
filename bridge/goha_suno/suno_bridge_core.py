@@ -1,9 +1,9 @@
-"""The bridge between the agent and the JR Suno Helper extension, without the sockets.
+"""The bridge between the agent and the GOHA Suno Helper extension, without the sockets.
 
-`BridgeCore` owns the job queue of every episode the agent touched, speaks the
-extension's JSON protocol, and hands out one job at a time. The WebSocket server
-(`scripts/suno_agent_bridge.py`) only moves messages in and out of it, so every
-rule here is testable without a browser.
+`BridgeCore` owns every job list the agent touched (projects, and whatever a plugin
+claims -- see `suno_plugin.py`), speaks the extension's JSON protocol, and hands out
+one job at a time. The WebSocket server (`suno_agent_bridge.py`) only moves messages
+in and out of it, so every rule here is testable without a browser.
 
 Protocol v2 (one JSON object per message; `PROTOCOL_VERSION` must match
 `lib/protocol.js`'s on the extension side). Pairing is a mutual HMAC-SHA256
@@ -21,7 +21,8 @@ handshake: the pairing token itself never crosses the socket.
 
 `queue` is a picture of every job this bridge knows, sent after auth and
 whenever it changes (`queue_update`), so the side panel can draw a whole
-episode's progress; the extension itself only ever holds the job it runs.
+job list's progress (`episodes` is the protocol's name for job lists); the
+extension itself only ever holds the job it runs.
 
 `orphan` recovers clip ids after the extension's service worker restarts mid
 Create-click (the socket drop already marked the job `unknown`): it never
@@ -45,8 +46,8 @@ carries `dryRun`/`observed`/`clipIds`/`seconds`/`mismatches` -- both may carry
 result whose extension-side form readback did not match the packet sent
 carries `mismatches` (field names) and `reason: "form_mismatch"`.
 
-The absolute download path (`C:\\Users\\<name>\\...`) never goes into the episode's
-tracked jobs file: only the folder is kept, in `local_dir` outside the repository.
+The absolute download path (`C:\\Users\\<name>\\...`) never goes into a job file:
+only the folder is kept, in `local_dir` (the bridge's own config folder).
 """
 
 from __future__ import annotations
@@ -61,16 +62,9 @@ import secrets
 from pathlib import Path
 from typing import Callable, Mapping
 
-import yaml
-
-from scripts.episode_audio import find_episode_dir, load_slot_titles, match_slot_by_title, read_suno_stamp
-from scripts.suno_clip_status import UUID as CLIP_UUID_PATTERN
-from scripts.suno_clip_status import ClipStatus, check_clips
-from scripts.suno_generation import append_generation_batch, check_packet_against_clips, plan_generation_jobs
-from scripts.suno_projects import ProjectError, is_episode_name, plan_generation as plan_project_generation
-from scripts.suno_projects import plan_song_jobs, project_store
-from scripts.suno_projects import projects_root as default_projects_root
-from scripts.suno_jobs import (
+from goha_suno.suno_clip_status import UUID as CLIP_UUID_PATTERN
+from goha_suno.suno_clip_status import ClipStatus, check_clips, check_packet_against_clips
+from goha_suno.suno_jobs import (
     IN_FLIGHT,
     JOBS_SUFFIX,
     KIND_DOWNLOAD,
@@ -79,15 +73,17 @@ from scripts.suno_jobs import (
     KIND_STEMS,
     JobStore,
     JobTransitionError,
-    plan_download_jobs,
-    plan_multitrack_jobs,
-    plan_stems_jobs,
 )
+from goha_suno.suno_plugin import Plugin
+from goha_suno.suno_projects import ProjectError, is_project_name, plan_generation as plan_project_generation
+from goha_suno.suno_projects import plan_song_jobs, project_store
+from goha_suno.suno_projects import projects_root as default_projects_root
+from goha_suno.suno_stamp import read_suno_stamp, title_matches
 
 PROTOCOL_VERSION = 2
 # Shown in the side panel footer next to the extension's own version ("Ext v… · App v…");
-# bump together with extensions/jr-suno-helper/manifest.json so a stale bridge is visible.
-BRIDGE_VERSION = "1.2.3"
+# bump together with extension/manifest.json so a stale bridge is visible.
+BRIDGE_VERSION = "1.3.0"
 TOKEN_FILENAME = "token"
 LOCAL_DRIVE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
 MAX_PATH_CHARS = 1024
@@ -139,7 +135,7 @@ RESULT_STATUSES = frozenset({"done", "failed", "needs_human"})
 # `user_stop` = the owner pressed DỪNG NGAY in the extension's side panel.
 PAUSING_ALERTS = frozenset({"captcha", "logged_out", "tab_closed", "tab_hidden", "user_stop"})
 MAX_ALERTS = 20
-# The queue picture stays small on the wire: an episode is ~36 jobs, a busy night a few episodes.
+# The queue picture stays small on the wire: a job list is a few dozen jobs, a busy night a few lists.
 QUEUE_PICTURE_MAX_JOBS = 400
 DOWNLOAD_DIRS_FILENAME = "download-dirs.json"
 # Whether the queue is paused outlives the bridge process: a CAPTCHA pause must not end with a restart.
@@ -262,17 +258,18 @@ class BridgeCore:
 
     def __init__(
         self,
-        root: Path,
         token: str,
         now: Callable[[], str],
         local_dir: Path | None = None,
         clip_status_fetch: Callable[[list[str]], list[ClipStatus]] = check_clips,
         bridge_path: Path | None = None,
         projects_root: Path | None = None,
+        plugin: Plugin | None = None,
     ):
-        self.root = root
-        # Jobs handed over directly (song links, Create packets) live in project folders here, not in episodes/.
+        # Jobs handed over directly (song links, Create packets) live in project folders here.
         self.projects_root = projects_root if projects_root is not None else default_projects_root()
+        # The names a plugin claims keep their job lists where the plugin says (see suno_plugin.py).
+        self.plugin = plugin
         # Told to the extension after a successful handshake, so its "copy MCP config" box is prefilled.
         self._bridge_path = str(bridge_path) if bridge_path else None
         self._local_dir = local_dir
@@ -295,21 +292,30 @@ class BridgeCore:
 
     # ── agent side ───────────────────────────────────────────────────────────────────────────
 
-    def _store(self, episode: str) -> JobStore:
-        """An episode's job list (`EP###…`), or else a project's under the projects root."""
-        if not is_episode_name(episode):
-            if episode not in self._stores:
-                self._stores[episode] = project_store(self.projects_root, episode)
-            return self._stores[episode]
-        episode_dir = find_episode_dir(self.root, episode)
-        if episode_dir.name not in self._stores:
-            self._stores[episode_dir.name] = JobStore.for_episode(episode_dir)
-        return self._stores[episode_dir.name]
+    def _claimed(self, name: str) -> bool:
+        return self.plugin is not None and self.plugin.claims(name)
 
-    def _enqueue_planned(self, store: JobStore, planned: list) -> dict:
+    def store(self, name: str) -> JobStore:
+        """The job list called `name`: a plugin's when it claims the name, else a project's under the projects root."""
+        if not self._claimed(name):
+            if name not in self._stores:
+                self._stores[name] = project_store(self.projects_root, name)
+            return self._stores[name]
+        path = self.plugin.job_file(name)
+        if path.parent.name not in self._stores:
+            self._stores[path.parent.name] = JobStore.at(path)
+        return self._stores[path.parent.name]
+
+    def add_jobs(self, store: JobStore, planned: list) -> tuple[list, list]:
+        """Queue planned jobs not already in `store` (a finished dry run of the same id makes room); (added, skipped)."""
+        store.forget_finished_dry_runs({job.id for job in planned})
         added, skipped = store.enqueue(planned, now=self._now())
         store.save()
         self._pump()
+        return added, skipped
+
+    def _enqueue_planned(self, store: JobStore, planned: list) -> dict:
+        added, skipped = self.add_jobs(store, planned)
         return {
             "project": store.path.parent.name,
             "added": [job.id for job in added],
@@ -319,9 +325,8 @@ class BridgeCore:
 
     def enqueue_project_songs(self, project: str, songs: list[str], kind: str, dry_run: bool = True) -> dict:
         """Songs named by link or id: `download` (WAV), `multitrack` (32-bit mix) or `stems` (split, 50 credits if not yet)."""
-        store = self._store(project)
+        store = self.store(project)
         planned = plan_song_jobs(store, project, songs, kind, dry_run=dry_run, fetch=self._clip_status_fetch)
-        store.forget_finished_dry_runs({job.id for job in planned})
         return self._enqueue_planned(store, planned)
 
     def enqueue_project_generation(
@@ -333,7 +338,7 @@ class BridgeCore:
         (an agent retrying after a lost answer would otherwise press Create twice), unless `allow_additional`
         says the user asked for more on purpose.
         """
-        store = self._store(project)
+        store = self.store(project)
         if not dry_run and not allow_additional:
             pending = [job.id for job in store.jobs if self._real_generation_unsettled(job)]
             if pending:
@@ -358,101 +363,8 @@ class BridgeCore:
                 return store
         raise KeyError(job_id)
 
-    def enqueue(self, episode: str, song_ids: list[str] | None = None) -> dict:
-        """Queue the episode's missing takes (optionally only these candidate songs)."""
-        store = self._store(episode)
-        planned, short = plan_download_jobs(store.path.parent)
-        if song_ids is not None:
-            wanted = set(song_ids)
-            planned = [job for job in planned if job.song_id in wanted]
-        added, skipped = store.enqueue(planned, now=self._now())
-        store.save()
-        self._pump()
-        return {
-            "episode": store.path.parent.name,
-            "added": len(added),
-            "skipped": len(skipped),
-            "slots_short_of_candidates": short,
-        }
-
-    def enqueue_multitrack(self, episode: str, slots: list[int] | None = None) -> dict:
-        """Queue the free 32-bit float export (Studio → Export → Multitrack) of the episode's filed takes."""
-        store = self._store(episode)
-        added, skipped = store.enqueue(plan_multitrack_jobs(store.path.parent, slots=slots), now=self._now())
-        store.save()
-        self._pump()
-        return {"episode": store.path.parent.name, "added": len(added), "skipped": len(skipped)}
-
-    def enqueue_stems(
-        self, episode: str, slots: list[int], takes: list[int] | None = None, dry_run: bool = True
-    ) -> dict:
-        """Queue stem splits (Auto split, 50 credits per take when `dry_run=False`) + 32-bit export of mix and stems."""
-        store = self._store(episode)
-        planned = plan_stems_jobs(store.path.parent, slots=slots, takes=takes, dry_run=dry_run)
-        store.forget_finished_dry_runs({job.id for job in planned})
-        added, skipped = store.enqueue(planned, now=self._now())
-        store.save()
-        self._pump()
-        return {
-            "episode": store.path.parent.name,
-            "added": len(added),
-            "skipped": len(skipped),
-            "dry_run": dry_run,
-            "jobs": [job.id for job in added],
-        }
-
-    def enqueue_generation(self, episode: str, slots: list[int] | None = None, dry_run: bool = True) -> dict:
-        """Queue Suno Create jobs. `dry_run=False` spends credits and is never planned around a slot that already has one out or unaccounted for."""
-        store = self._store(episode)
-        planned = plan_generation_jobs(store.path.parent, slots=slots, dry_run=dry_run)
-        blocked_slots: list[int] = []
-        if not dry_run:
-            allowed = []
-            for job in planned:
-                if self._blocks_real_generation(store, job.slot):
-                    blocked_slots.append(job.slot)
-                else:
-                    allowed.append(job)
-            planned = allowed
-        store.forget_finished_dry_runs({job.id for job in planned})
-        added, skipped = store.enqueue(planned, now=self._now())
-        store.save()
-        self._pump()
-        return {
-            "episode": store.path.parent.name,
-            "added": len(added),
-            "skipped": len(skipped),
-            "blocked_slots": blocked_slots,
-        }
-
-    @staticmethod
-    def _blocks_real_generation(store: JobStore, slot: int) -> bool:
-        """A slot already has a generate job whose fate a real run must not gamble past.
-
-        In flight (sent/running) or `unknown` (the link dropped mid-job, so the
-        Create click's outcome is unknown) refuses outright. A `failed` or
-        `needs_human` job that already reports clip ids spent credits too, and so
-        may one that stopped at or after the Create step without any ids; only
-        the agent or the owner may decide to requeue it.
-        """
-        for job in store.jobs:
-            if job.kind != KIND_GENERATE or job.slot != slot:
-                continue
-            if job.status in IN_FLIGHT or job.status == "unknown":
-                return True
-            if job.status in {"failed", "needs_human"} and job.result.get("clip_ids"):
-                return True
-            # Stopped at or after the Create step with no ids to show: the click may still have spent credits.
-            if (
-                job.status in {"failed", "needs_human"}
-                and not job.dry_run
-                and job.result.get("last_step") in GENERATE_UNCANCELLABLE_STEPS
-            ):
-                return True
-        return False
-
-    def jobs(self, episode: str | None = None) -> list[dict]:
-        stores = [self._store(episode)] if episode else list(self._stores.values())
+    def jobs(self, name: str | None = None) -> list[dict]:
+        stores = [self.store(name)] if name else list(self._stores.values())
         return [self._job_summary(job) for store in stores for job in store.jobs]
 
     @staticmethod
@@ -539,20 +451,20 @@ class BridgeCore:
             return {}
         return json.loads(path.read_text(encoding="utf-8"))
 
-    def _remember_download_dir(self, episode: str, file_path: str) -> None:
+    def _remember_download_dir(self, name: str, file_path: str) -> None:
         # Windows paths arrive from Chrome with backslashes; split on either separator.
         folder = re.split(r"[\\/](?=[^\\/]*$)", file_path)[0]
-        self._download_dirs[episode] = folder
+        self._download_dirs[name] = folder
         if self._local_dir is not None:
             self._local_dir.mkdir(parents=True, exist_ok=True)
             (self._local_dir / DOWNLOAD_DIRS_FILENAME).write_text(
                 json.dumps(self._download_dirs, ensure_ascii=False, indent=2), encoding="utf-8"
             )
 
-    def download_dir(self, episode: str) -> Path | None:
-        """Where Chrome put this episode's (or project's) finished downloads (kept outside the repo)."""
-        name = find_episode_dir(self.root, episode).name if is_episode_name(episode) else episode
-        folder = self._download_dirs.get(name)
+    def download_dir(self, name: str) -> Path | None:
+        """Where Chrome put the finished downloads of this job list (kept in the bridge's config folder)."""
+        key = self.plugin.job_file(name).parent.name if self._claimed(name) else name
+        folder = self._download_dirs.get(key)
         return Path(folder) if folder else None
 
     # ── extension side ───────────────────────────────────────────────────────────────────────
@@ -577,39 +489,40 @@ class BridgeCore:
         return json.loads(path.read_text(encoding="utf-8")).get("paused") is True
 
     def recover(self) -> None:
-        """Load every episode's job list once this process owns the port; work left out is now unknown.
+        """Load every job list once this process owns the port; work left out is now unknown.
 
         Only the bridge that won 127.0.0.1:47831 may call this: a second copy (an
         agent probing its MCP config) must never rewrite job files the live one
         is still holding in memory.
         """
-        for path in sorted((self.root / "episodes").glob(f"*/*{JOBS_SUFFIX}")):
-            episode_dir = path.parent
-            if path.name != f"{episode_dir.name.split('-')[0]}{JOBS_SUFFIX}" or episode_dir.name in self._stores:
-                continue
-            store = JobStore.for_episode(episode_dir)
-            if store.mark_in_flight_unknown(now=self._now()):
-                store.save()
-            self._stores[episode_dir.name] = store
+        for path in sorted(self.plugin.job_files()) if self.plugin is not None else ():
+            if path.parent.name not in self._stores:
+                self._recover_store(path.parent.name, path)
         for path in sorted(self.projects_root.glob(f"*/*{JOBS_SUFFIX}")):
             name = path.parent.name
-            if path.name != f"{name}{JOBS_SUFFIX}" or name in self._stores or is_episode_name(name):
+            if path.name != f"{name}{JOBS_SUFFIX}" or name in self._stores or not is_project_name(name):
                 continue
-            try:
-                store = JobStore.at(path)
-            except (OSError, ValueError, TypeError) as error:  # one damaged project must not stop the bridge
-                self.alerts = (self.alerts + [{"kind": "project_unreadable", "at": self._now(), "project": name,
-                                               "error": f"{type(error).__name__}"}])[-MAX_ALERTS:]
-                continue
-            if store.mark_in_flight_unknown(now=self._now()):
-                store.save()
-            self._stores[name] = store
+            self._recover_store(name, path)
+
+    def _recover_store(self, name: str, path: Path) -> None:
+        try:
+            store = JobStore.at(path)
+        except (OSError, ValueError, TypeError) as error:  # one damaged job list must not stop the bridge
+            self.add_alert("project_unreadable", project=name, error=type(error).__name__)
+            return
+        if store.mark_in_flight_unknown(now=self._now()):
+            store.save()
+        self._stores[name] = store
+
+    def add_alert(self, kind: str, **fields) -> None:
+        """Something the agent should hear about on its next suno_status (the last MAX_ALERTS are kept)."""
+        self.alerts = (self.alerts + [{"kind": kind, "at": self._now(), **fields}])[-MAX_ALERTS:]
 
     def queue_picture(self) -> dict:
         """Every known job, oldest first, in the shape the side panel draws.
 
-        Over the cap, the episodes touched most recently are kept: the one the
-        owner is watching run must never be the one left out.
+        Over the cap, the job lists touched most recently are kept: the one the
+        user is watching run must never be the one left out.
         """
         episodes = []
         budget = QUEUE_PICTURE_MAX_JOBS
@@ -742,8 +655,7 @@ class BridgeCore:
             # Reloading brought back the same old version (an unpacked folder older than this bridge): tell the
             # user instead of asking again and holding every job forever.
             self._outdated_extension = False
-            self.alerts = (self.alerts + [{"kind": "extension_outdated", "at": self._now(),
-                                           "version": handshake["version"]}])[-MAX_ALERTS:]
+            self.add_alert("extension_outdated", version=handshake["version"])
         if self._outdated_extension:
             self._reload_asked_of = handshake["version"]
             self._outbox.append({"type": "reload"})
@@ -782,7 +694,7 @@ class BridgeCore:
         store, job_id = active
         step = str(message.get("step", ""))[:64]
         now = self._now()
-        # First time each step starts, kept for the per-step timings (scripts/suno_job_stats.py).
+        # First time each step starts, kept for per-step timings.
         step_times = dict(store.get(job_id).result.get("step_times", {}))
         step_times.setdefault(step, now)
         progress = {"last_step": step, "step_times": step_times}
@@ -824,28 +736,25 @@ class BridgeCore:
             self._outbox.append({"type": "error", "message": str(error)})
             return
         store.save()
-        # A project has no music_test_results.yaml: its clip ids stay on the job itself.
-        if job.kind == KIND_GENERATE and status == "done" and updated.result.get("dry_run") is False and is_episode_name(job.episode):
-            self._record_batch(store, updated)
+        if self._claimed(job.episode):
+            self._plugin_result(store, updated)
         self.active_job_id = None
         # The result can land before its alert; whatever stopped this job would stop the next one too.
         if status == "needs_human":
             self.paused = True
         self._pump()
 
-    def _record_batch(self, store: JobStore, job) -> None:
-        """Write the finished generation's batch; on failure keep the ids on the job and alert the agent.
+    def _plugin_result(self, store: JobStore, job) -> None:
+        """Let the plugin that owns the job follow up on its result; its failure never stops the queue.
 
-        The append builds and checks the new YAML before replacing the file, so a
-        failure leaves music_test_results.yaml as it was; the clip ids are never
-        lost because they already sit on the job.
+        The job's own record (clip ids, file name) is already saved, so nothing paid for is lost.
         """
         try:
-            append_generation_batch(store.path.parent, job, generated_at=self._now()[:10])
-        except (OSError, ValueError, yaml.YAMLError, KeyError) as error:
-            store.annotate(job.id, now=self._now(), result={"batch_append_error": f"{type(error).__name__}: {error}"[:300]})
+            self.plugin.on_result(self, store, job)
+        except Exception as error:  # noqa: BLE001 - a plugin bug must never crash the bridge mid-queue
+            store.annotate(job.id, now=self._now(), result={"plugin_error": f"{type(error).__name__}: {error}"[:300]})
             store.save()
-            self.alerts = (self.alerts + [{"kind": "batch_append_failed", "at": self._now(), "job": job.id}])[-MAX_ALERTS:]
+            self.add_alert("plugin_failed", job=job.id)
 
     def _download_result(self, store: JobStore, job, status: str, message: dict) -> dict:
         result = {
@@ -869,11 +778,8 @@ class BridgeCore:
                         result["stamp_studio"] = stamp.studio
             filename = re.split(r"[\\/]", str(result.get("filename", "")))[-1]
             result["filename"] = filename
-            if is_episode_name(job.episode):
-                titles = load_slot_titles(store.path.parent)
-                result["title_ok"] = match_slot_by_title(Path(filename).stem, titles) == job.slot
-            else:
-                result["title_ok"] = match_slot_by_title(Path(filename).stem, {job.slot: job.expected_title}) == job.slot
+            title_ok = self.plugin.title_ok(store, job, Path(filename).stem) if self._claimed(job.episode) else None
+            result["title_ok"] = title_matches(Path(filename).stem, job.expected_title) if title_ok is None else bool(title_ok)
         return result
 
     def _multitrack_result(self, store: JobStore, status: str, message: dict) -> dict:
@@ -992,7 +898,7 @@ class BridgeCore:
 
     def _alert(self, message: dict) -> None:
         kind = str(message.get("kind", ""))[:32]
-        self.alerts = (self.alerts + [{"kind": kind, "at": self._now()}])[-MAX_ALERTS:]
+        self.add_alert(kind)
         if kind in PAUSING_ALERTS:
             self.paused = True
 

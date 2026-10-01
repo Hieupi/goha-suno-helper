@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 PACKAGE = Path(__file__).resolve().parent.parent
-BRIDGE = PACKAGE / "bridge" / "scripts" / "suno_agent_bridge.py"
+BRIDGE = PACKAGE / "bridge" / "goha_suno" / "suno_agent_bridge.py"
 EXTENSION = PACKAGE / "extension"
 
 
@@ -23,9 +23,8 @@ def main() -> int:
     try:
         import mcp.server  # noqa: F401
         import websockets  # noqa: F401
-        import yaml  # noqa: F401
 
-        import scripts.suno_agent_bridge  # noqa: F401
+        import goha_suno.suno_agent_bridge  # noqa: F401
     except ImportError as error:
         print(f"  [!] Cầu nối chưa chạy được: {error}. Chạy lại CAI-DAT.bat.")
         return 1
