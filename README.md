@@ -47,7 +47,8 @@ hỏi xác nhận, và không vượt hạn mức tài khoản của bạn. Bạ
 
 ```
 extension/          Chrome extension (MV3) — test: cd extension && node --test tests/*.test.mjs
-bridge/scripts/     cầu nối Python (MCP) — test: python -m unittest discover -s bridge/tests -t bridge
+bridge/goha_suno/   cầu nối Python (MCP) — test: python -m unittest discover -s bridge/tests -t bridge
+                    thêm việc/tool riêng của bạn: biến GOHA_SUNO_PLUGIN (xem bridge/goha_suno/suno_plugin.py)
 installer/          CAI-DAT.bat + cai_dat.py
 tools/build_release.py   đóng gói dist/GOHA-Suno-Helper-<phiên bản>.zip (tự kiểm bí mật, đường dẫn, chạy thử cầu nối)
 ```
