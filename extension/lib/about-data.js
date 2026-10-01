@@ -29,7 +29,7 @@ export const ABOUT = Object.freeze({
         id: "github",
         title: "Mã nguồn trên GitHub",
         desc: "Tặng repo 1 ⭐ để mình có động lực làm tiếp",
-        href: "https://github.com/HieuPi/goha-suno-helper",
+        href: "https://github.com/Hieupi/goha-suno-helper",
         icon: "i-star"
       }
     ]
