@@ -2,3 +2,5 @@
 extension/install.json
 __pycache__/
 *.pyc
+plans/
+dist/

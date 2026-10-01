@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>Thử kết nối 127.0.0.1 (chỉ bản dev)</title>
+  <style>
+    body { font: 14px/1.5 system-ui, "Segoe UI", sans-serif; margin: 24px; max-width: 640px; }
+    li { margin: 6px 0; }
+    .ok { color: #15803d; } .bad { color: #b91c1c; }
+    code { background: #f1f5f9; padding: 1px 4px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Thử kết nối 127.0.0.1 từ trang extension</h1>
+  <p>Trang chỉ dùng khi phát triển. Cần chạy trước:
+    <code>python tools/jr-suno-hub/spikes/lna_probe_server.py</code></p>
+  <button id="run" type="button">Chạy thử</button>
+  <ul id="out"></ul>
+  <script src="lna-probe.js" type="module"></script>
+</body>
+</html>

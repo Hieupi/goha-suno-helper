@@ -21,6 +21,11 @@ Chi tiết từng bước, câu mẫu giao việc, xử lý sự cố: **[HUONG-
 
 Cần: Windows, Chrome 116+, Python 3.10+, gói Suno **Premier** cho các việc dùng Studio (tải WAV, 32-bit, tách stem).
 
+<!-- repo-only -->
+> Repo này là **mã nguồn**. Người dùng tải **gói đã đóng sẵn** (file `.zip`) ở mục Releases hoặc Google Drive —
+> đừng chạy thẳng từ bản clone.
+<!-- /repo-only -->
+
 ## ⭐ Nếu thấy hữu ích
 
 Tặng repo **1 sao** để mình có thêm động lực làm tiếp, và chia sẻ cho bạn bè cùng làm nhạc với Suno.
@@ -36,6 +41,19 @@ Tặng repo **1 sao** để mình có thêm động lực làm tiếp, và chia 
 
 Không liên kết với Suno, Inc. Extension chỉ bấm những nút bạn vẫn tự bấm, theo tốc độ người dùng, dừng khi Suno
 hỏi xác nhận, và không vượt hạn mức tài khoản của bạn. Bạn tự chịu trách nhiệm tuân thủ điều khoản của Suno.
+
+<!-- repo-only -->
+## Phát triển
+
+```
+extension/          Chrome extension (MV3) — test: cd extension && node --test tests/*.test.mjs
+bridge/scripts/     cầu nối Python (MCP) — test: python -m unittest discover -s bridge/tests -t bridge
+installer/          CAI-DAT.bat + cai_dat.py
+tools/build_release.py   đóng gói dist/GOHA-Suno-Helper-<phiên bản>.zip (tự kiểm bí mật, đường dẫn, chạy thử cầu nối)
+```
+
+Báo lỗi, góp ý: mục Issues hoặc Group Facebook ở trên. Pull request luôn được chào đón.
+<!-- /repo-only -->
 
 ## Giấy phép
 

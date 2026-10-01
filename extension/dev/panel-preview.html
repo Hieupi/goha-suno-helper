@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="vi" data-skin="neon" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GOHA Suno Helper — xem trước (dev)</title>
+  <!-- Đặt da trước khi vẽ để không chớp (xem ui/skin.js). -->
+  <script src="fake-chrome.js"></script>
+  <script src="../ui/skin.js"></script>
+  <link rel="stylesheet" href="../ui/tokens.css" />
+  <link rel="stylesheet" href="../ui/sidepanel.css" />
+  <link rel="stylesheet" href="../ui/about.css" />
+</head>
+<body class="app">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mark" viewBox="0 0 24 24"><rect x=".5" y=".5" width="23" height="23" rx="5.5" fill="#1B2A4A" stroke="#2F426E"/><circle cx="14" cy="10" r="6.5" fill="#D9412B"/><g stroke="#fff" stroke-width="1.4" stroke-linecap="round"><path d="M11 8.5v3M13 7v6M15 7.5v5M17 9v2"/></g><text x="3" y="21" font-size="7" font-weight="800" fill="#fff" font-family="system-ui">G</text></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M9 6v12M15 6v12"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-neq" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14M15 5L9 19"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12M11 11V4.5a1.5 1.5 0 0 1 3 0V12M14 11.5V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a6 6 0 0 1-5-2.7L3 14.5a1.5 1.5 0 0 1 2.4-1.8L8 15"/></symbol>
+  <symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M9 12h6M12 9v6"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></symbol>
+  <symbol id="i-log" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M20 7v5h-5"/><path d="M20 12a8 8 0 1 1-2.3-5.7L20 8"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+  <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 17h5"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 7l4.2 3.1L12 4l4.8 6.1L21 7l-1.7 11H4.7L3 7z" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7a4.3 4.3 0 0 1 7.5 2.8C19.5 15.4 12 20 12 20z"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z"/></symbol>
+  <symbol id="i-coffee" viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5c0 1 1 1.5 1 2.5M12 3.5c0 1 1 1.5 1 2.5"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.2 0 1.8-.8 1.8-1.8 0-1.2-1-1.6-1-2.7 0-1 .8-1.5 1.8-1.5H17a4 4 0 0 0 4-4C21 6.5 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7" r="1"/></symbol>
+</svg>
+  <header class="ph">
+    <h1 class="brand"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg><span class="brand-goha">GOHA</span> Suno Helper<span id="brandVer" class="brand-ver"></span></h1>
+    <span class="spacer"></span>
+    <span class="pill" id="statusPill" role="status" aria-live="polite"><span class="dot"></span><span id="statusText">Đang mở…</span></span>
+    <button class="iconbtn" id="skinBtn" type="button" title="Đổi giao diện" aria-label="Đổi giao diện"><svg class="i" aria-hidden="true"><use href="#i-palette"/></svg><span id="skinName">Neon</span></button>
+  </header>
+  <nav class="tabs" role="tablist" aria-label="Các mục">
+    <button class="tab" role="tab" id="tab-overview" aria-controls="view-overview" aria-selected="false" data-view="overview"><svg class="i i20" aria-hidden="true"><use href="#i-home"/></svg>Tổng quan</button>
+    <button class="tab" role="tab" id="tab-queue" aria-controls="view-queue" aria-selected="false" data-view="queue"><svg class="i i20" aria-hidden="true"><use href="#i-list"/></svg>Hàng chờ</button>
+    <button class="tab" role="tab" id="tab-library" aria-controls="view-library" aria-selected="false" data-view="library"><svg class="i i20" aria-hidden="true"><use href="#i-music"/></svg>Thư viện</button>
+    <button class="tab" role="tab" id="tab-log" aria-controls="view-log" aria-selected="false" data-view="log"><svg class="i i20" aria-hidden="true"><use href="#i-log"/></svg>Nhật ký</button>
+    <button class="tab" role="tab" id="tab-settings" aria-controls="view-settings" aria-selected="false" data-view="settings"><svg class="i i20" aria-hidden="true"><use href="#i-gear"/></svg>Cài đặt</button>
+    <button class="tab" role="tab" id="tab-about" aria-controls="view-about" aria-selected="false" data-view="about"><svg class="i i20" aria-hidden="true"><use href="#i-heart"/></svg>Giới thiệu</button>
+  </nav>
+  <main id="views">
+  <section class="view body" role="tabpanel" id="view-overview" aria-labelledby="tab-overview" hidden></section>
+  <section class="view body" role="tabpanel" id="view-queue" aria-labelledby="tab-queue" hidden></section>
+  <section class="view body" role="tabpanel" id="view-library" aria-labelledby="tab-library" hidden></section>
+  <section class="view body" role="tabpanel" id="view-log" aria-labelledby="tab-log" hidden></section>
+  <section class="view body" role="tabpanel" id="view-settings" aria-labelledby="tab-settings" hidden></section>
+  <section class="view body" role="tabpanel" id="view-about" aria-labelledby="tab-about" hidden></section>
+  </main>
+  <div class="dock">
+    <div class="runbar" id="runbar" hidden>
+      <div class="txt"><b id="runTitle">Đang chạy</b><span id="runStep" class="meta"></span></div>
+      <button class="btn stop" id="stopBtn" type="button"><svg class="i" aria-hidden="true"><use href="#i-stop"/></svg>DỪNG NGAY</button>
+    </div>
+    <!-- Chân trang kiểu GOHA Flow: huy hiệu bản quyền (PREMIUM vàng kim) + phiên bản extension và cầu nối (App). -->
+    <footer class="foot">
+      <button class="lic-badge" id="licBadge" type="button"><svg class="i" aria-hidden="true"><use href="#i-crown"/></svg><span id="licLabel">PREMIUM</span></button>
+      <span class="foot-ver" id="footVer" role="status" aria-live="polite"></span>
+    </footer>
+  </div>
+  <div class="toast-host" id="toastHost" role="status" aria-live="polite"></div>
+  <script src="../sidepanel.js" type="module"></script>
+</body>
+</html>
