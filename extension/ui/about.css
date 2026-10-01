@@ -1,0 +1,48 @@
+/* Tab "Giới thiệu" (ui/about-panel.js). Dùng token của ui/tokens.css để hợp cả da Neon lẫn Cổ điển;
+   màu riêng chỉ cho ô biểu tượng của từng kênh (màu thương hiệu YouTube/Facebook). */
+#view-about { display: flex; flex-direction: column; gap: var(--sp-4); }
+
+.ab-hero { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--sp-1); padding: var(--sp-5) var(--sp-4); }
+.ab-avatar { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; border: 2px solid var(--ai); }
+[data-skin="neon"] .ab-avatar { box-shadow: var(--neon-glow-cyan); }
+.ab-badge { display: inline-block; margin-top: var(--sp-2); padding: 2px var(--sp-2); border-radius: var(--r-pill); background: var(--t-ai); color: var(--ai); font-size: var(--fs-12); font-weight: 600; }
+.ab-name { margin: var(--sp-1) 0 0; font-size: var(--fs-20); font-weight: 800; letter-spacing: .02em; }
+.ab-desc { margin: 0; font-size: var(--fs-13); color: var(--text-muted); }
+.ab-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2); margin-top: var(--sp-3); }
+.ab-pill { display: inline-flex; align-items: center; min-height: 28px; padding: 0 var(--sp-3); border-radius: var(--r-pill); border: 1px solid var(--border-strong); color: var(--text); font-size: var(--fs-13); font-weight: 600; text-decoration: none; }
+.ab-pill:hover { border-color: var(--ai); color: var(--ai); }
+
+.ab-sec { display: flex; flex-direction: column; gap: var(--sp-2); }
+.ab-h { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-13); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.ab-h::before { content: ""; width: 3px; height: 14px; border-radius: 2px; background: var(--ai); }
+.ab-grid { display: grid; gap: var(--sp-2); }
+
+.ab-card { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); color: var(--text); text-decoration: none; transition: border-color var(--dur-1) var(--ease-out); }
+a.ab-card:hover { border-color: var(--ai); }
+a.ab-card:focus-visible, .ab-pill:focus-visible { outline: 2px solid var(--ai); outline-offset: 2px; }
+.ab-card.off { opacity: .55; cursor: default; }
+.ab-ico { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: var(--r-md); background: var(--t-ai); color: var(--ai); font-weight: 800; font-size: var(--fs-16); }
+.ab-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ab-txt b { font-size: var(--fs-14); font-weight: 600; }
+.ab-txt span { font-size: var(--fs-12); color: var(--text-muted); }
+.ab-go { color: var(--text-muted); font-size: var(--fs-16); }
+.ab-soon { flex: none; padding: 1px 6px; border-radius: var(--r-sm); background: var(--t-kohaku); color: var(--kohaku); font-size: var(--fs-12); font-weight: 600; white-space: nowrap; }
+
+.ab-drive { background: #E8F0FE; color: #1A73E8; }
+.ab-github { background: #24292F; color: #F2CC60; }
+.ab-phone { background: var(--t-matsu); color: var(--matsu); }
+.ab-community { background: #1877F2; color: #FFFFFF; }
+.ab-youtube { background: #FF0000; color: #FFFFFF; }
+
+.ab-donate { display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+.ab-donate-head { display: flex; align-items: center; gap: var(--sp-2); color: var(--kohaku); }
+.ab-donate-head b { display: block; color: var(--text); font-size: var(--fs-14); }
+.ab-qr { margin: 0; align-self: center; text-align: center; }
+.ab-qr img { display: block; width: 180px; height: 180px; padding: var(--sp-2); border-radius: var(--r-lg); background: #FFFFFF; }
+.ab-qr figcaption { margin-top: var(--sp-1); font-size: var(--fs-12); color: var(--text-muted); }
+.ab-bank { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--sp-3); margin: 0; font-size: var(--fs-13); }
+.ab-bank dt { color: var(--text-muted); }
+.ab-bank dd { margin: 0; font-weight: 600; }
+.ab-bank .ab-stk { font-family: var(--font-mono); font-size: var(--fs-16); letter-spacing: .06em; color: var(--ai); }
+
+.ab-foot { text-align: center; }

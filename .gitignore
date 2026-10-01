@@ -1,0 +1,4 @@
+# Written per machine by CAI-DAT.bat
+extension/install.json
+__pycache__/
+*.pyc

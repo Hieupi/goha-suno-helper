@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "GOHA Suno Helper",
+  "short_name": "GOHA Suno",
+  "version": "1.2.3",
+  "version_name": "1.2.3 · ProMax",
+  "minimum_chrome_version": "116",
+  "description": "GOHA: trợ lý AI của bạn (Claude Code, Codex, Antigravity) giao việc qua cầu nối 127.0.0.1; extension lái giao diện Suno để tạo nhạc và tải WAV. Không đọc phiên đăng nhập, dừng ở CAPTCHA.",
+  "permissions": [
+    "storage",
+    "downloads",
+    "alarms",
+    "sidePanel",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://suno.com/*",
+    "https://studio-api.prod.suno.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://suno.com/*"
+      ],
+      "js": [
+        "lib/suno-logic.js",
+        "lib/suno-dom.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "GOHA Suno Helper",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
