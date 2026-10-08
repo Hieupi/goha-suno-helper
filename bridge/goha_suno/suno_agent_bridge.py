@@ -237,7 +237,7 @@ def build_server(bridge: SocketBridge, port: int):
 
     @server.tool()
     async def suno_download_songs(project: str, songs: list[str]) -> dict:
-        """Download Suno songs as WAV (Studio export, no monthly download quota). `songs`: suno.com/song/<id> links or ids.
+        """Download Suno songs as WAV via Studio export (a Premier plan feature). `songs`: suno.com/song/<id> links or ids.
 
         Files land in the browser's Downloads folder under GOHA-Suno/<project>/. Free: no credits.
         """

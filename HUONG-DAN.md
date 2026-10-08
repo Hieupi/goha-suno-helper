@@ -3,7 +3,7 @@
 GOHA Suno Helper là trợ lý làm việc trên Suno thay bạn, ngay trong Chrome của bạn. Bạn nói với trợ lý AI
 (Claude Code, Codex, Antigravity…) bằng tiếng Việt, trợ lý giao việc cho extension, extension bấm Suno giúp bạn:
 
-- **Tải WAV** các bài bạn đưa link, đi đường Studio export nên không trừ lượt tải hằng tháng.
+- **Tải WAV** các bài bạn đưa link, qua tính năng Studio export có sẵn trong gói Premier của bạn.
 - **Xuất 32-bit float**: bản trộn 48 kHz / 32-bit, chất lượng cao nhất Suno cho, để mix/master trên DAW.
 - **Tách stem**: Auto split rồi tải bản trộn và từng nhạc cụ (Bass, Guitar, Strings…), tất cả 32-bit.
 - **Tạo nhạc**: điền form Create (Advanced) theo mô tả của bạn rồi bấm Create.

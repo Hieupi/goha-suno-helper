@@ -33,8 +33,8 @@ JOBS_SUFFIX = "-suno-jobs.json"
 
 KIND_DOWNLOAD = "export_download"
 KIND_GENERATE = "generate"
-# Studio → Export → Multitrack of a song: its full mix as 48 kHz / 32-bit float (0 credits,
-# no monthly quota) until stems are split, then every stem. Seen on Suno 2026-09-28.
+# Studio → Export → Multitrack of a song: its full mix as 48 kHz / 32-bit float (0 credits on the
+# Premier plan) until stems are split, then every stem. Seen on Suno 2026-09-28.
 KIND_MULTITRACK = "multitrack_export"
 # Suno "Extract Stems and MIDI" → Auto split (50 credits, measured 2026-10-01), then Studio → Export →
 # Multitrack of the split project: the mix and every stem as 48 kHz / 32-bit float in one ZIP.

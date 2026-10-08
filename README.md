@@ -4,7 +4,7 @@
 
 Bạn nói với trợ lý AI của mình (Claude Code, Codex, Antigravity…), GOHA Suno Helper bấm Suno ngay trong Chrome của bạn:
 
-- 🎧 **Tải WAV** hàng loạt theo link bài, không trừ lượt tải hằng tháng
+- 🎧 **Tải WAV** hàng loạt theo link bài, qua tính năng Studio export có sẵn trong gói Premier của bạn
 - 💎 **Xuất 32-bit float** (48 kHz) để mix/master trên DAW
 - 🎛️ **Tách stem** (Auto split) và tải bản trộn + từng nhạc cụ ở 32-bit
 - ✨ **Tạo nhạc** theo mô tả, điền form Create giúp bạn

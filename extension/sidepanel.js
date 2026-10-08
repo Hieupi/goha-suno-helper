@@ -145,7 +145,7 @@ function licenseCard() {
       h("div", {}, h("h3", {}, license.premium ? "GOHA Suno Helper · PREMIUM" : "GOHA Suno Helper · Dùng thử"),
         h("div", { class: "meta" }, license.title))),
     h("ul", { class: "feat" },
-      h("li", {}, "Tải WAV hàng loạt qua Studio (không trừ hạn mức tháng)"),
+      h("li", {}, "Tải WAV hàng loạt qua Studio export (gói Premier)"),
       h("li", {}, "Xuất bản 32-bit float miễn phí (Multitrack)"),
       h("li", {}, "Tách stem + tải bản trộn và từng nhạc cụ 32-bit để mix trên DAW"),
       h("li", {}, "Tạo nhạc hàng loạt — luôn hỏi bạn trước khi tiêu credit"),
